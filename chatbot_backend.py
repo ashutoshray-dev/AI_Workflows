@@ -7,6 +7,8 @@ load_dotenv()
 from langgraph.checkpoint.sqlite import SqliteSaver
 import sqlite3
 from langgraph.graph.message import add_messages
+import os
+os.environ.get("LANGCHAIN_PROJECT") = "Chatbot-graph"
 class ChatState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
 

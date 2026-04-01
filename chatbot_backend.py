@@ -7,22 +7,53 @@ load_dotenv()
 from langgraph.checkpoint.sqlite import SqliteSaver
 import sqlite3
 from langgraph.graph.message import add_messages
+from langgraph.prebuilt import tools_condition, ToolNode, tool_node
+from langchain_core.tools import tool
+from langchain_community.tools import DuckDuckGoSearchRun
+from langchain_tavily import TavilySearch
+import os
+os.environ["LANGCHAIN_PROJECT"] = "Chatbot-graph"
 class ChatState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
 
+search = DuckDuckGoSearchRun()
+# search = TavilySearch()
+def calculator(first_num: float, second_num: float, operation:str)-> dict:
+    """Perform a basic arithmetic operation on two numbers. Supported operations:add, sub, mul, div."""
+    try:
+        if operation == "add" or operation=="+":
+            result = first_num+second_num
+        elif operation == "sub" or operation=="-":
+            result = first_num-second_num
+        elif operation == "mul" or operation=="*":
+            result = first_num*second_num
+        elif operation == "div" or operation=="/":
+            result = first_num/second_num
+        else:
+            return {"error":f"Unsupported operation `{operation}`"}
+        
+        return {"first_num":first_num, "second_name":second_num, "operation":operation, "result":result}
+    except Exception as e:
+        return {"error": str(e)}
+tools = [search, calculator]
 model = ChatOllama(model='qwen2.5:3b')
+model_with_tools = model.bind_tools(tools)
 def chat_node(state:ChatState):
     messages = state['messages']
     # print(messages)
-    response = model.invoke(messages)
+    response = model_with_tools.invoke(messages)
     return {'messages': [response]}
 
 conn = sqlite3.connect(database='langraph_chatbot.db', check_same_thread=False)
 checkpointer = SqliteSaver(conn=conn)
+tool_node = ToolNode(tools)
 graph = StateGraph(ChatState)
 graph.add_node('chat', chat_node)
+graph.add_node('tools', tool_node)
 graph.add_edge(START, 'chat')
-graph.add_edge('chat', END)
+graph.add_conditional_edges('chat', tools_condition)
+graph.add_edge('tools', 'chat')
+# graph.add_edge('chat', END)
 chatbot = graph.compile(checkpointer=checkpointer)
 # thread_id = 1
 # while True:

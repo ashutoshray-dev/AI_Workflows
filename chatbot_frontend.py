@@ -1,6 +1,6 @@
 import streamlit as st
 from chatbot_backend import chatbot, retrieve_threads_list
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AIMessage
 import uuid
 
 def generate_thread_id():
@@ -68,13 +68,14 @@ if user_input:
         #     )
         # )
     # latest version of streaming      -------> returns a dict with type, ns and data as keys with value of data being the tupple returned in v1
-        ai_message = st.write_stream(
-            message_chunk['data'][0].content for message_chunk in chatbot.stream(
+        def ai_message_stream():
+            for message_chunk in chatbot.stream(
                 {'messages':[HumanMessage(content=user_input)]},
                 config=CONFIG,
                 stream_mode='messages',
                 version='v2'
-            )
-        )
-        
-    st.session_state['message_history'].append({'role':'assistant', 'content':ai_message})
+            ):
+                if isinstance(message_chunk['data'][0], AIMessage):
+                    yield message_chunk['data'][0].content 
+        ai_message = st.write_stream(ai_message_stream())
+        st.session_state['message_history'].append({'role':'assistant', 'content':ai_message})

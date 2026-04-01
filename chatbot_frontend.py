@@ -73,11 +73,6 @@ if user_input:
                 version='v2'
             ):
                 if isinstance(message_chunk['data'][0], AIMessage):
-                    msg = message_chunk['data'][0].content
-                    yield msg
-            st.session_state['message_history'].append({'role':'assistant', 'content':msg})
+                    yield message_chunk['data'][0].content 
         ai_message = st.write_stream(ai_message_stream())
-
-        # st.session_state['message_history'].append({'role':'assistant', 'content':ai_message})
-        # with st.chat_message('ai'):
-        #     st.text(type(ai_message))
+        st.session_state['message_history'].append({'role':'assistant', 'content':ai_message})

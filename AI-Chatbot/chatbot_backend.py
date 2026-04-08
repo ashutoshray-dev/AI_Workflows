@@ -11,11 +11,16 @@ from langgraph.prebuilt import tools_condition, ToolNode, tool_node
 from langchain_core.tools import tool
 from langchain_community.tools import DuckDuckGoSearchRun
 from langchain_tavily import TavilySearch
+from langchain_core.runnables import RunnableConfig
+from typing import TypedDict, Annotated
 import os
 os.environ["LANGCHAIN_PROJECT"] = "Chatbot-graph"
 class ChatState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
+    chat_title: str
 
+class chattitle(TypedDict):
+    chat_title: Annotated[str, "A brief 3-4word title that captures the essence of the input."]
 search = DuckDuckGoSearchRun()
 # search = TavilySearch()
 def calculator(first_num: float, second_num: float, operation:str)-> dict:
@@ -32,17 +37,20 @@ def calculator(first_num: float, second_num: float, operation:str)-> dict:
         else:
             return {"error":f"Unsupported operation `{operation}`"}
         
-        return {"first_num":first_num, "second_name":second_num, "operation":operation, "result":result}
+        return {"first_num":first_num, "second_num":second_num, "operation":operation, "result":result}
     except Exception as e:
         return {"error": str(e)}
 tools = [search, calculator]
 model = ChatOllama(model='qwen2.5:3b')
 model_with_tools = model.bind_tools(tools)
-def chat_node(state:ChatState):
+def chat_node(state:ChatState, config: RunnableConfig):
     messages = state['messages']
     # print(messages)
     response = model_with_tools.invoke(messages)
-    return {'messages': [response]}
+    if not state.get('chat_title'):
+        title = generate_title(messages[0].content)
+        return {'messages': [response], 'chat_title':title}
+    return {'messages':[response]}
 
 conn = sqlite3.connect(database='langraph_chatbot.db', check_same_thread=False)
 checkpointer = SqliteSaver(conn=conn)
@@ -71,3 +79,13 @@ def retrieve_threads_list():
         all_threads.add(checkpoint.config['configurable']['thread_id'])
 
     return list(all_threads)
+def generate_title(user_input):
+    structured_model = model.with_structured_output(chattitle)
+    title = structured_model.invoke(f'summarise this message input and generate a suitable 4-5words title for this input that feels appropriate for the topic. If no input is present genetrate a random string.\ninput:{user_input}')
+    return title['chat_title']
+def retrieve_titles(config):
+    all_titles = set()
+    for checkpoint in checkpointer.list(None):
+        all_titles.add(checkpoint.config['configurable']['chat_title'])
+
+    return list(all_titles)

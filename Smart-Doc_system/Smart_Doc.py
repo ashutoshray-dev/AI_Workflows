@@ -12,7 +12,6 @@ from dotenv import load_dotenv
 load_dotenv()
 import os
 os.environ["LANGCHAIN_PROJECT"] = "Smart_Doc-ragQuery"
-
 st.title('Smart_Doc System')
 st.subheader('A smart workflow that takes file uploads and answers questions based on them')
 uploaded_file = st.file_uploader(

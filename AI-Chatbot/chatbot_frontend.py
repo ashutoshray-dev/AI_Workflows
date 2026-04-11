@@ -1,6 +1,6 @@
 import streamlit as st
 from chatbot_backend import chatbot, retrieve_threads_list, generate_title, retrieve_titles
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import HumanMessage, AIMessage, AIMessageChunk
 import uuid
 
 def generate_thread_id():
@@ -95,7 +95,7 @@ if user_input:
                 stream_mode='messages',
                 version='v2'
             ):
-                if isinstance(message_chunk['data'][0], AIMessage) and message_chunk['data'][0].content:
+                if isinstance(message_chunk['data'][0], AIMessageChunk) and message_chunk['data'][0].content:
                     yield message_chunk['data'][0].content
         ai_message = st.write_stream(ai_message_stream())
         st.session_state['message_history'].append({'role':'assistant', 'content':ai_message})

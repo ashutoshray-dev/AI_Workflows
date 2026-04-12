@@ -13,8 +13,10 @@ from langchain_community.tools import DuckDuckGoSearchRun
 from langchain_tavily import TavilySearch
 from langchain_core.runnables import RunnableConfig
 from typing import TypedDict, Annotated
+import requests
 import os
 os.environ["LANGCHAIN_PROJECT"] = "Chatbot-graph"
+stock_api=os.getenv('ALPHAVANTAGE_API_KEY')
 class ChatState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
     chat_title: str
@@ -40,7 +42,16 @@ def calculator(first_num: float, second_num: float, operation:str)-> dict:
         return {"first_num":first_num, "second_num":second_num, "operation":operation, "result":result}
     except Exception as e:
         return {"error": str(e)}
-tools = [search, calculator]
+
+def get_stock_price(symbol:str)->dict:
+    """fetch latest stock price for a given symbol (e.g. AAPL, TSLA).
+    Use Alpha Vantage api with key in the url."""
+    URL = (
+        f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={symbol}&apikey={stock_api}"
+        )
+    response = requests.get(url=URL)
+    return response.json()
+tools = [search, calculator, get_stock_price]
 model = ChatOllama(model='qwen2.5:3b')
 model_with_tools = model.bind_tools(tools)
 def chat_node(state:ChatState, config: RunnableConfig):
@@ -74,7 +85,7 @@ chatbot = graph.compile(checkpointer=checkpointer)
 #     print('AI: ', response['messages'][-1].content)
 
 def retrieve_threads_list():
-    all_threads = set()
+    all_threads = set(list())
     for checkpoint in checkpointer.list(None):
         all_threads.add(checkpoint.config['configurable']['thread_id'])
 

@@ -1,5 +1,5 @@
 import streamlit as st
-from chatbot_backend import chatbot, retrieve_threads_list, generate_title, retrieve_titles
+from chatbot_backend import chatbot, retrieve_threads_list
 from langchain_core.messages import HumanMessage, AIMessage, AIMessageChunk
 import uuid
 
@@ -11,15 +11,11 @@ def reset_chat():
     st.session_state['thread_id'] = thread_id
     add_thread(st.session_state['thread_id'])
     st.session_state['message_history'] = []
-    # st.session_state['chat_title'] = generate_title('')
 
 def add_thread(thread_id):
     if thread_id not in st.session_state['chat_threads']:
         st.session_state['chat_threads'].append(thread_id)
 
-# def add_titles(chat_title):
-#     if chat_title not in st.session_state['all_titles']:
-#         st.session_state['all_titles'].append(chat_title)
 def load_history(thread_id):
     if 'messages' not in chatbot.get_state(config={'configurable':{'thread_id':thread_id}}).values:
         return []
@@ -33,18 +29,12 @@ def load_chat(thread_id):
 
 if 'message_history' not in st.session_state:
     st.session_state['message_history'] = []
-    # st.session_state['chat_title'] = generate_title(st.session_state['message_history'][0])
 if 'thread_id' not in st.session_state:
     st.session_state['thread_id'] = generate_thread_id()
 if 'chat_threads' not in st.session_state:
     st.session_state['chat_threads'] = retrieve_threads_list()
-# if 'all_titles' not in st.session_state:
-#     st.session_state['all_titles'] = retrieve_titles(RunnableConfig())
-# if 'chat_title' not in st.session_state:
-#     st.session_state['chat_title'] = generate_title(' ')
 
 add_thread(st.session_state['thread_id'])
-# add_titles(st.session_state['chat_title'])
 
 st.sidebar.title('Langgraph Chatbot')
 if st.sidebar.button('New Chat'):
@@ -68,12 +58,9 @@ for message in st.session_state['message_history']:
     with st.chat_message(message['role']):
         st.text(message['content'])
 
-# CONFIG = {'configurable':{'thread_id':st.session_state['thread_id'], 'chat_title':st.session_state['chat_title']}}
 CONFIG = {'configurable':{'thread_id':st.session_state['thread_id']}}
 user_input = st.chat_input('Enter here')
-# if 'chat_title' not in st.session_state:
 if user_input:
-    # st.session_state['chat_title'] = generate_title(user_input=user_input)
     st.session_state['message_history'].append({'role':'user', 'content':user_input})
     with st.chat_message('user'):
         st.text(user_input)

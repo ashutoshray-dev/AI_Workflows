@@ -22,7 +22,7 @@ class ChatState(TypedDict):
     chat_title: str
 
 class chattitle(TypedDict):
-    chat_title: Annotated[str, "A brief 3-4word title that captures the essence of the input."]
+    chat_title: Annotated[str, "A brief 4-5word title that captures the essence of the input."]
 search = DuckDuckGoSearchRun()
 # search = TavilySearch()
 def calculator(first_num: float, second_num: float, operation:str)-> dict:
@@ -83,20 +83,16 @@ chatbot = graph.compile(checkpointer=checkpointer)
 #     config = {'configurable':{'thread_id':thread_id}}
 #     response = chatbot.invoke({'messages': [HumanMessage(content=user_message)]}, config=config)
 #     print('AI: ', response['messages'][-1].content)
-
 def retrieve_threads_list():
-    all_threads = set(list())
+    seen_threads = set()
+    all_threads = list()
     for checkpoint in checkpointer.list(None):
-        all_threads.add(checkpoint.config['configurable']['thread_id'])
-
-    return list(all_threads)
+        thread = checkpoint.config['configurable']['thread_id']
+        if thread not in seen_threads:
+            seen_threads.add(thread)
+            all_threads.insert(0, thread)
+    return all_threads
 def generate_title(user_input):
     structured_model = model.with_structured_output(chattitle)
     title = structured_model.invoke(f'summarise this message input and generate a suitable 4-5words title for this input that feels appropriate for the topic. If no input is present genetrate a random string.\ninput:{user_input}')
     return title['chat_title']
-def retrieve_titles(config):
-    all_titles = set()
-    for checkpoint in checkpointer.list(None):
-        all_titles.add(checkpoint.config['configurable']['chat_title'])
-
-    return list(all_titles)

@@ -48,10 +48,9 @@ for thread_id in st.session_state['chat_threads'][::-1]:
         temp_message = []
         for msg in messages:
             if isinstance(msg, HumanMessage):
-                role='user'
-            else:
-                role='assistant'
-            temp_message.append({'role':role, 'content':msg.content})
+                temp_message.append({'role':'user', 'content':msg.content})
+            elif isinstance(msg, AIMessage) and not msg.tool_calls:
+                temp_message.append({'role':'assistant', 'content':msg.content})
         st.session_state['message_history'] = temp_message
 
 for message in st.session_state['message_history']:
@@ -82,7 +81,7 @@ if user_input:
                 stream_mode='messages',
                 version='v2'
             ):
-                if isinstance(message_chunk['data'][0], AIMessageChunk) and message_chunk['data'][0].content:
+                if isinstance(message_chunk['data'][0], AIMessageChunk):
                     yield message_chunk['data'][0].content
         ai_message = st.write_stream(ai_message_stream())
         st.session_state['message_history'].append({'role':'assistant', 'content':ai_message})

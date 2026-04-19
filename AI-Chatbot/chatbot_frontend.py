@@ -1,6 +1,6 @@
 import streamlit as st
 from chatbot_backend import chatbot, retrieve_threads_list
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import HumanMessage, AIMessage, AIMessageChunk
 import uuid
 
 def generate_thread_id():
@@ -15,11 +15,17 @@ def reset_chat():
 def add_thread(thread_id):
     if thread_id not in st.session_state['chat_threads']:
         st.session_state['chat_threads'].append(thread_id)
+
 def load_history(thread_id):
     if 'messages' not in chatbot.get_state(config={'configurable':{'thread_id':thread_id}}).values:
         return []
     else:
         return chatbot.get_state(config={'configurable':{'thread_id':thread_id}}).values['messages']
+def load_chat(thread_id):
+    if 'chat_title' not in chatbot.get_state(config={'configurable':{'thread_id':thread_id}}).values:
+        return " "
+    else:
+        return chatbot.get_state(config={'configurable':{'thread_id':thread_id}}).values['chat_title']
 
 if 'message_history' not in st.session_state:
     st.session_state['message_history'] = []
@@ -35,16 +41,16 @@ if st.sidebar.button('New Chat'):
     reset_chat()
 st.sidebar.header('My conversations')
 for thread_id in st.session_state['chat_threads'][::-1]:
-    if st.sidebar.button(str(thread_id)):
+    title = load_chat(thread_id)
+    if st.sidebar.button(label=str(title), key=thread_id):
         st.session_state['thread_id'] = thread_id
         messages = load_history(thread_id=thread_id)
         temp_message = []
         for msg in messages:
             if isinstance(msg, HumanMessage):
-                role='user'
-            else:
-                role='assistant'
-            temp_message.append({'role':role, 'content':msg.content})
+                temp_message.append({'role':'user', 'content':msg.content})
+            elif isinstance(msg, AIMessage) and not msg.tool_calls:
+                temp_message.append({'role':'assistant', 'content':msg.content})
         st.session_state['message_history'] = temp_message
 
 for message in st.session_state['message_history']:
@@ -75,7 +81,7 @@ if user_input:
                 stream_mode='messages',
                 version='v2'
             ):
-                if isinstance(message_chunk['data'][0], AIMessage):
-                    yield message_chunk['data'][0].content 
+                if isinstance(message_chunk['data'][0], AIMessageChunk):
+                    yield message_chunk['data'][0].content
         ai_message = st.write_stream(ai_message_stream())
         st.session_state['message_history'].append({'role':'assistant', 'content':ai_message})

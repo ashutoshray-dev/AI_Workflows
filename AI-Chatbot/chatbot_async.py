@@ -29,6 +29,10 @@ client = MultiServerMCPClient(
             "args": []
             # "url": "http://localhost:8020/mcp"
         },
+        "expense": {
+            "transport": "streamable_http",
+            "url": "https://splendid-gold-dingo.fastmcp.app/mcp"
+        }
     }
 )
 class ChatState(TypedDict):
@@ -101,7 +105,7 @@ async def main():
 
     chatbot = await build_graph()
     CONFIG = {'configurable':{'thread_id':'thread1432'}}
-    result = await chatbot.ainvoke({'messages':[HumanMessage(content="search the web to find the ipl 19 ending date")]}, config=CONFIG)
+    result = await chatbot.ainvoke({'messages':[HumanMessage(content="list all the expense from 1 april to 30 april 2026.")]}, config=CONFIG)
     print(result['messages'][-1].content)
     # async def generate_title(user_input):
     #     structured_model = model.with_structured_output(chattitle)

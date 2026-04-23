@@ -17,15 +17,27 @@ from typing import TypedDict, Annotated
 import requests
 import os
 import asyncio
+from langchain_mcp_adapters.client import MultiServerMCPClient
 os.environ["LANGCHAIN_PROJECT"] = "Chatbot-graph"
 stock_api=os.getenv('ALPHAVANTAGE_API_KEY')
+client = MultiServerMCPClient(
+    {
+        "ddg-search": {
+            "transport": "stdio",
+            "command": "duckduckgo-mcp-server",
+            # "args": ["duckduckgo-mcp-server"],
+            "args": []
+            # "url": "http://localhost:8020/mcp"
+        },
+    }
+)
 class ChatState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
     # chat_title: str
 
 class chattitle(TypedDict):
     chat_title: Annotated[str, "A brief 4-5word title that captures the essence of the input."]
-search = DuckDuckGoSearchRun()
+# search = DuckDuckGoSearchRun()
 # search = TavilySearch()
 def calculator(first_num: float, second_num: float, operation:str)-> dict:
     """Perform a basic arithmetic operation on two numbers. Supported operations:add, sub, mul, div."""
@@ -53,12 +65,13 @@ def get_stock_price(symbol:str)->dict:
         )
     response = requests.get(url=URL)
     return response.json()
-tools = [search, calculator, get_stock_price]
+# tools = [search, calculator, get_stock_price]
 model = ChatOllama(model='qwen2.5:3b')
-model_with_tools = model.bind_tools(tools)
 
-def build_graph():
-
+async def build_graph():
+    tools = await client.get_tools()
+    # print(tools)
+    model_with_tools = model.bind_tools(tools)
     async def chat_node(state:ChatState):
         messages = state['messages']
         # print(messages)
@@ -86,9 +99,9 @@ def build_graph():
 
 async def main():
 
-    chatbot = build_graph()
+    chatbot = await build_graph()
     CONFIG = {'configurable':{'thread_id':'thread1432'}}
-    result = await chatbot.ainvoke({'messages':[HumanMessage(content="who are you?")]}, config=CONFIG)
+    result = await chatbot.ainvoke({'messages':[HumanMessage(content="search the web to find the ipl 19 ending date")]}, config=CONFIG)
     print(result['messages'][-1].content)
     # async def generate_title(user_input):
     #     structured_model = model.with_structured_output(chattitle)

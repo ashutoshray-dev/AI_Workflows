@@ -1,0 +1,108 @@
+import streamlit as st
+from backend_async import chatbot, retrieve_threads_list, submit_async_task
+from langchain_core.messages import HumanMessage, AIMessage, AIMessageChunk
+import uuid
+import queue
+
+def generate_thread_id():
+    thread_id = uuid.uuid4()
+    return thread_id
+def reset_chat():
+    thread_id = generate_thread_id()
+    st.session_state['thread_id'] = thread_id
+    add_thread(st.session_state['thread_id'])
+    st.session_state['message_history'] = []
+
+def add_thread(thread_id):
+    if thread_id not in st.session_state['chat_threads']:
+        st.session_state['chat_threads'].append(thread_id)
+
+def load_history(thread_id):
+    if 'messages' not in chatbot.get_state(config={'configurable':{'thread_id':thread_id}}).values:
+        return []
+    else:
+        return chatbot.get_state(config={'configurable':{'thread_id':thread_id}}).values['messages']
+def load_chat(thread_id):
+    if 'chat_title' not in chatbot.get_state(config={'configurable':{'thread_id':thread_id}}).values:
+        return " "
+    else:
+        return chatbot.get_state(config={'configurable':{'thread_id':thread_id}}).values['chat_title']
+
+if 'message_history' not in st.session_state:
+    st.session_state['message_history'] = []
+if 'thread_id' not in st.session_state:
+    st.session_state['thread_id'] = generate_thread_id()
+if 'chat_threads' not in st.session_state:
+    st.session_state['chat_threads'] = retrieve_threads_list()
+
+add_thread(st.session_state['thread_id'])
+
+st.sidebar.title('Langgraph Chatbot')
+if st.sidebar.button('New Chat'):
+    reset_chat()
+st.sidebar.header('My conversations')
+for thread_id in st.session_state['chat_threads'][::-1]:
+    title = load_chat(thread_id)
+    if st.sidebar.button(label=str(title), key=thread_id):
+        st.session_state['thread_id'] = thread_id
+        messages = load_history(thread_id=thread_id)
+        temp_message = []
+        for msg in messages:
+            if isinstance(msg, HumanMessage):
+                temp_message.append({'role':'user', 'content':msg.content})
+            elif isinstance(msg, AIMessage) and not msg.tool_calls:
+                temp_message.append({'role':'assistant', 'content':msg.content})
+        st.session_state['message_history'] = temp_message
+
+for message in st.session_state['message_history']:
+    with st.chat_message(message['role']):
+        st.text(message['content'])
+
+CONFIG = {'configurable':{'thread_id':st.session_state['thread_id']}}
+user_input = st.chat_input('Enter here')
+if user_input:
+    st.session_state['message_history'].append({'role':'user', 'content':user_input})
+    with st.chat_message('user'):
+        st.text(user_input)
+
+    with st.chat_message('assistant'):
+    # older version of streaming          -------> returns a tupple with message_chunk and metadata at 0 and 1 indices respectively
+        # ai_message = st.write_stream(
+        #     message_chunk.content for message_chunk, metadata in chatbot.stream(
+        #         {'messages':[HumanMessage(content=user_input)]},
+        #         config=CONFIG,
+        #         stream_mode='messages'
+        #     )
+        # )
+    # latest version of streaming      -------> returns a dict with type, ns and data as keys with value of data being the tupple returned in v1
+        def ai_message_stream():
+            event_queue: queue.Queue = queue.Queue()
+            async def run_stream():
+                try: 
+                    async for message_chunk in chatbot.astream(
+                        {'messages':[HumanMessage(content=user_input)]},
+                        config=CONFIG,
+                        stream_mode='messages',
+                        version='v2'
+                    ):
+                        event_queue.put(message_chunk['data'])
+                except Exception as e:
+                    event_queue.put(('error', e))
+                finally:
+                    event_queue.put(None)
+            submit_async_task(run_stream())
+            
+            while True:
+                item = event_queue.get()
+                if item is None:
+                    break
+                message_chunk = item[0]
+                if message_chunk == 'error':
+                    raise item[1]
+                
+
+                if isinstance(message_chunk, AIMessage):
+                    yield message_chunk.content
+
+        ai_message = st.write_stream(ai_message_stream())
+        st.session_state['message_history'].append({'role':'assistant', 'content':ai_message})

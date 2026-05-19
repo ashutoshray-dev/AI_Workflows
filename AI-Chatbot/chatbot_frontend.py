@@ -55,7 +55,7 @@ for thread_id in st.session_state['chat_threads'][::-1]:
 
 for message in st.session_state['message_history']:
     with st.chat_message(message['role']):
-        st.text(message['content'])
+        st.markdown(message['content'])
 
 CONFIG = {'configurable':{'thread_id':st.session_state['thread_id']}}
 user_input = st.chat_input('Enter here')

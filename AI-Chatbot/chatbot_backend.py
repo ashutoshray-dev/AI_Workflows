@@ -1,6 +1,6 @@
 from langgraph.graph import StateGraph, START, END
 from typing import TypedDict, Annotated
-from langchain_core.messages import HumanMessage, BaseMessage
+from langchain_core.messages import HumanMessage, BaseMessage, AIMessage
 from langchain_ollama import ChatOllama
 from dotenv import load_dotenv
 load_dotenv()
@@ -60,8 +60,8 @@ def chat_node(state:ChatState, config: RunnableConfig):
     response = model_with_tools.invoke(messages)
     if not state.get('chat_title'):
         title = generate_title(messages[0].content)
-        return {'messages': [response], 'chat_title':title}
-    return {'messages':[response]}
+        return {'messages': [AIMessage(content=response.content)], 'chat_title':title}
+    return {'messages':[AIMessage(content=response.content)]}
 
 conn = sqlite3.connect(database='langraph_chatbot.db', check_same_thread=False)
 checkpointer = SqliteSaver(conn=conn)

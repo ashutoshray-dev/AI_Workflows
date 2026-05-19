@@ -1,7 +1,8 @@
 import streamlit as st
-from chatbot_backend import chatbot, retrieve_threads_list
+from backend_async import chatbot, retrieve_threads_list, submit_async_task
 from langchain_core.messages import HumanMessage, AIMessage, AIMessageChunk
 import uuid
+import queue
 
 def generate_thread_id():
     thread_id = uuid.uuid4()
@@ -55,7 +56,7 @@ for thread_id in st.session_state['chat_threads'][::-1]:
 
 for message in st.session_state['message_history']:
     with st.chat_message(message['role']):
-        st.markdown(message['content'])
+        st.text(message['content'])
 
 CONFIG = {'configurable':{'thread_id':st.session_state['thread_id']}}
 user_input = st.chat_input('Enter here')
@@ -75,13 +76,33 @@ if user_input:
         # )
     # latest version of streaming      -------> returns a dict with type, ns and data as keys with value of data being the tupple returned in v1
         def ai_message_stream():
-            for message_chunk in chatbot.stream(
-                {'messages':[HumanMessage(content=user_input)]},
-                config=CONFIG,
-                stream_mode='messages',
-                version='v2'
-            ):
-                if isinstance(message_chunk['data'][0], AIMessageChunk):
-                    yield message_chunk['data'][0].content
+            event_queue: queue.Queue = queue.Queue()
+            async def run_stream():
+                try: 
+                    async for message_chunk in chatbot.astream(
+                        {'messages':[HumanMessage(content=user_input)]},
+                        config=CONFIG,
+                        stream_mode='messages',
+                        version='v2'
+                    ):
+                        event_queue.put(message_chunk['data'])
+                except Exception as e:
+                    event_queue.put(('error', e))
+                finally:
+                    event_queue.put(None)
+            submit_async_task(run_stream())
+            
+            while True:
+                item = event_queue.get()
+                if item is None:
+                    break
+                message_chunk = item[0]
+                if message_chunk == 'error':
+                    raise item[1]
+                
+
+                if isinstance(message_chunk, AIMessage):
+                    yield message_chunk.content
+
         ai_message = st.write_stream(ai_message_stream())
         st.session_state['message_history'].append({'role':'assistant', 'content':ai_message})
